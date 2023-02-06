@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Box, Button, TextField } from "@mui/material";
 import { v4 as uuidv4 } from "uuid";
+import axios from "axios";
 
 const CreateSession: React.FC = () => {
   const navigate = useNavigate();
@@ -10,6 +11,17 @@ const CreateSession: React.FC = () => {
   const createSession = async () => {
     setNewUrl("");
     const sessionId = uuidv4();
+
+    const response = await axios.post(
+      `http://localhost:8000/sessions/${sessionId}`, 
+      { 
+        url: newUrl
+      }
+    );
+    if (response.status !== 201) {
+      return;
+    }
+
     navigate(`/watch/${sessionId}`);
   };
 

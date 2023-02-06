@@ -1,16 +1,20 @@
 import { Box, Button, Card, IconButton, Stack } from "@mui/material";
-import React, { useRef, useState } from "react";
+import React, { forwardRef, useImperativeHandle, useRef, useState } from "react";
 import ReactPlayer from "react-player";
 
 interface VideoPlayerProps {
   url: string;
   hideControls?: boolean;
+  videoPlayerRef: React.MutableRefObject<any>;
+  eventCallback?: (event: any) => void;
+  joinCallback: () => void;
 }
 
-const VideoPlayer: React.FC<VideoPlayerProps> = ({ url, hideControls }) => {
+const VideoPlayer: React.FC<VideoPlayerProps> = forwardRef(({ url, hideControls, videoPlayerRef, eventCallback, joinCallback }) => {
   const [hasJoined, setHasJoined] = useState(false);
   const [isReady, setIsReady] = useState(false);
   const player = useRef<ReactPlayer>(null);
+  const [playing, setPlaying] = useState(false);
 
   const handleReady = () => {
     setIsReady(true);
@@ -34,17 +38,30 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ url, hideControls }) => {
   };
 
   const handlePlay = () => {
-    console.log(
-      "User played video at time: ",
-      player.current?.getCurrentTime()
-    );
+    if (eventCallback) {
+        eventCallback({
+          action: 'play',
+          isPlaying: true,
+          url,
+          mediaTimeSeconds: player.current?.getCurrentTime(),
+          timestamp: new Date()
+        });
+    }
+
+    setPlaying(true);
   };
 
   const handlePause = () => {
-    console.log(
-      "User paused video at time: ",
-      player.current?.getCurrentTime()
-    );
+    if (eventCallback) {
+        eventCallback({
+          action: 'pause',
+          isPlaying: false,
+          url,
+          mediaTimeSeconds: player.current?.getCurrentTime(),
+          timestamp: new Date()
+        });
+    }
+    setPlaying(false);
   };
 
   const handleBuffer = () => {
@@ -57,8 +74,42 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ url, hideControls }) => {
     loaded: number;
     loadedSeconds: number;
   }) => {
-    console.log("Video progress: ", state);
+    if (eventCallback) {
+        eventCallback({
+          action: 'progress',
+          isPlaying: playing,
+          url,
+          mediaTimeSeconds: player.current?.getCurrentTime(),
+          timestamp: new Date()
+        });
+    }
   };
+
+  // Expose functions for parent
+  useImperativeHandle(videoPlayerRef, () => ({
+    play(mediaTimeSeconds: number) {
+      player.current?.seekTo(mediaTimeSeconds, 'seconds')
+      setPlaying(true);
+    },
+
+    pause(mediaTimeSeconds: number) {
+      player.current?.seekTo(mediaTimeSeconds, 'seconds')
+      setPlaying(false);
+    },
+
+    seek(mediaTimeSeconds: number, isPlaying: boolean) {
+      player.current?.seekTo(mediaTimeSeconds, 'seconds')
+      setPlaying(isPlaying);
+    },
+
+    getPlaying() {
+      return playing;
+    },
+
+    getCurrentTime() {
+      return player.current?.getCurrentTime() ?? 0;
+    }
+  }));
 
   return (
     <Box
@@ -78,7 +129,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ url, hideControls }) => {
         <ReactPlayer
           ref={player}
           url={url}
-          playing={hasJoined}
+          playing={hasJoined && playing}
           controls={!hideControls}
           onReady={handleReady}
           onEnded={handleEnd}
@@ -99,13 +150,16 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ url, hideControls }) => {
         <Button
           variant="contained"
           size="large"
-          onClick={() => setHasJoined(true)}
+          onClick={() => {
+            joinCallback();
+            setHasJoined(true);
+          }}
         >
           Watch Session
         </Button>
       )}
     </Box>
   );
-};
+});
 
 export default VideoPlayer;
